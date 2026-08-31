@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["DynamicAppIconModule"]
+  },
+  "android": {
+    "modules": ["com.barberaa.dynamicappicon.DynamicAppIconModule"]
+  }
+}

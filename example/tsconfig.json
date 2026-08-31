@@ -1,0 +1,10 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "paths": {
+      "@barberaa/dynamic-app-icon": ["../src/index"],
+      "@barberaa/dynamic-app-icon/*": ["../src/*"]
+    }
+  }
+}
