@@ -6,6 +6,7 @@
   "types": "build/index.d.ts",
   "scripts": {
     "build": "node internal/module_scripts/build.js",
+    "build:plugin": "node internal/module_scripts/build.js plugin",
     "clean": "node internal/module_scripts/clean.js",
     "lint": "eslint src/",
     "test": "node internal/module_scripts/test.js",
@@ -29,6 +30,8 @@
   "dependencies": {},
   "devDependencies": {
     "@babel/core": "^7.26.0",
+    "@expo/config-plugins": "^57.0.9",
+    "@expo/image-utils": "^0.11.5",
     "@types/jest": "^29.2.1",
     "@types/react": "~19.1.1",
     "babel-preset-expo": "~55.0.8",
