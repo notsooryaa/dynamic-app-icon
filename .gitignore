@@ -55,3 +55,6 @@ yarn-error.log
 
 # Expo
 .expo/*
+
+# npm pack output (build artifact — regenerate with `npm pack`)
+*.tgz

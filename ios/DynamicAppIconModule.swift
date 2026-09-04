@@ -8,7 +8,7 @@ private let iconSetPrefix = "DAIAppIcon_"
 
 private let iconNamesPlistKey = "DAIIconNames"
 
-private class IconNotConfiguredException: GenericException<(String, [String])> {
+private class IconNotConfiguredException: GenericException<(String, [String])>, @unchecked Sendable {
   override var reason: String {
     let (name, available) = param
     let list = available.map { "\"\($0)\"" }.joined(separator: ", ")
@@ -16,13 +16,13 @@ private class IconNotConfiguredException: GenericException<(String, [String])> {
   }
 }
 
-private class UnsupportedException: Exception {
+private class UnsupportedException: Exception, @unchecked Sendable {
   override var reason: String {
     "Alternate app icons are not supported on this device."
   }
 }
 
-private class IconSwitchFailedException: GenericException<String> {
+private class IconSwitchFailedException: GenericException<String>, @unchecked Sendable {
   override var reason: String {
     "Unable to switch application icon: \(param)"
   }

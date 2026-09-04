@@ -40,7 +40,13 @@ class DynamicAppIconModule : Module() {
     AsyncFunction("setAppIcon") { name: String ->
       setCurrentIcon(name)
     }
+
+    OnActivityEntersBackground {
+      applyPendingIcon()
+    }
   }
+
+  private var pendingIconName: String? = null
 
 
   private val context: Context
@@ -80,11 +86,22 @@ class DynamicAppIconModule : Module() {
     if (!configured.contains(name)) {
       throw IconNotConfiguredException(name, configured)
     }
+    pendingIconName = name
+  }
+
+  private fun applyPendingIcon() {
+    val target = pendingIconName ?: return
+    pendingIconName = null
+
+    val configured = getConfiguredIconNames()
+    if (!configured.contains(target)) {
+      return
+    }
 
     try {
       for (iconName in configured) {
         val component = aliasComponentFor(iconName)
-        val newState = if (iconName == name) {
+        val newState = if (iconName == target) {
           PackageManager.COMPONENT_ENABLED_STATE_ENABLED
         } else {
           PackageManager.COMPONENT_ENABLED_STATE_DISABLED
@@ -105,6 +122,8 @@ class DynamicAppIconModule : Module() {
     }
   }
   private fun getCurrentIconName(): String {
+    pendingIconName?.let { return it }
+
     val configured = getConfiguredIconNames()
 
     for (iconName in configured) {
