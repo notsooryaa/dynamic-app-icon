@@ -14,7 +14,7 @@ export enum DynamicAppIconErrorCode {
   IconNotConfigured = 'ERR_ICON_NOT_CONFIGURED',
   InvalidArgument = 'ERR_INVALID_ARGUMENT',
   Unsupported = 'ERR_UNSUPPORTED',
-  SwitchFailed = 'ERR_SWITCH_FAILED',
+  SwitchFailed = 'ERR_ICON_SWITCH_FAILED',
 }
 
 export class DynamicAppIconError extends Error {
