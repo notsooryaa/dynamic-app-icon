@@ -1,6 +1,6 @@
 {
   "name": "@barberaa/dynamic-app-icon",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Expo dynamic icon module",
   "main": "build/index.js",
   "types": "build/index.d.ts",
