@@ -1,6 +1,6 @@
 {
   "name": "@barberaa/dynamic-app-icon",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Expo dynamic icon module",
   "main": "build/index.js",
   "types": "build/index.d.ts",
@@ -51,8 +51,8 @@
     ]
   },
   "peerDependencies": {
-    "expo": "*",
-    "react": "*",
-    "react-native": "*"
-  }
+  "expo": ">=52.0.0",
+  "react": ">=18.0.0",
+  "react-native": ">=0.76.0"
+}
 }
