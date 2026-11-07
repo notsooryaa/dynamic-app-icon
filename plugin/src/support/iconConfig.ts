@@ -1,7 +1,12 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-import type { AppIconConfig, DynamicAppIconPluginProps } from '../types';
+import type {
+  AdaptiveIconDefinition,
+  AdaptiveLayers,
+  AppIconConfig,
+  DynamicAppIconPluginProps,
+} from '../types';
 
 /**
  * Allowed icon-name pattern.
@@ -70,22 +75,88 @@ export function resolveIcons(
     }
     seen.add(name);
 
-    validateSourceValue(name, source);
-
-    const absoluteSource = path.isAbsolute(source) ? source : path.resolve(projectRoot, source);
-
-    if (!fs.existsSync(absoluteSource)) {
-      throw new DynamicAppIconConfigError(`Icon file does not exist:\n${source}`);
+    if (typeof source !== 'object' || source === null) {
+      validateSourceValue(name, source);
+      result.push({ name, source: resolveFile(name, source, projectRoot) });
+    } else {
+      result.push(resolveObjectIcon(name, source, projectRoot));
     }
-
-    if (!fs.statSync(absoluteSource).isFile()) {
-      throw new DynamicAppIconConfigError(`Icon "${name}" source is not a file:\n${source}`);
-    }
-
-    result.push({ name, source: absoluteSource });
   }
 
   return result;
+}
+
+const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+
+function resolveFile(name: string, value: string, projectRoot: string): string {
+  const absolute = path.isAbsolute(value) ? value : path.resolve(projectRoot, value);
+
+  if (!fs.existsSync(absolute)) {
+    throw new DynamicAppIconConfigError(`Icon file does not exist:\n${value}`);
+  }
+
+  if (!fs.statSync(absolute).isFile()) {
+    throw new DynamicAppIconConfigError(`Icon "${name}" source is not a file:\n${value}`);
+  }
+
+  return absolute;
+}
+
+function resolveObjectIcon(name: string, def: unknown, projectRoot: string): AppIconConfig {
+  if (typeof def !== 'object' || def === null || Array.isArray(def)) {
+    throw new DynamicAppIconConfigError(
+      `Icon "${name}" must map to an image path string or an object with ` +
+        '"source", "foreground", "background" and/or "monochrome".'
+    );
+  }
+
+  const { source, foreground, background, monochrome } = def as AdaptiveIconDefinition;
+
+  for (const [key, value] of Object.entries({ source, foreground, background, monochrome })) {
+    if (value !== undefined && (typeof value !== 'string' || value.trim().length === 0)) {
+      throw new DynamicAppIconConfigError(`Icon "${name}" has an invalid "${key}" value.`);
+    }
+  }
+
+  if (!source && !foreground) {
+    throw new DynamicAppIconConfigError(
+      `Icon "${name}" needs at least a "source" or a "foreground" image.`
+    );
+  }
+
+  if (!foreground && (background !== undefined || monochrome !== undefined)) {
+    throw new DynamicAppIconConfigError(
+      `Icon "${name}" sets "background" or "monochrome" without a "foreground" image.`
+    );
+  }
+
+  const resolvedForeground = foreground ? resolveFile(name, foreground, projectRoot) : undefined;
+  const resolvedSource = source ? resolveFile(name, source, projectRoot) : resolvedForeground!;
+
+  if (!resolvedForeground) {
+    return { name, source: resolvedSource };
+  }
+
+  const adaptive: AdaptiveLayers = { foreground: resolvedForeground };
+
+  if (background === undefined) {
+    adaptive.backgroundColor = '#FFFFFF';
+  } else if (background.startsWith('#')) {
+    if (!HEX_COLOR.test(background)) {
+      throw new DynamicAppIconConfigError(
+        `Icon "${name}" background color "${background}" must look like #RRGGBB.`
+      );
+    }
+    adaptive.backgroundColor = background.toUpperCase();
+  } else {
+    adaptive.backgroundImage = resolveFile(name, background, projectRoot);
+  }
+
+  if (monochrome) {
+    adaptive.monochrome = resolveFile(name, monochrome, projectRoot);
+  }
+
+  return { name, source: resolvedSource, adaptive };
 }
 
 function validateName(name: string): void {

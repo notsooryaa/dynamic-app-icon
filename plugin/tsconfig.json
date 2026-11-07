@@ -1,8 +1,9 @@
 {
   "compilerOptions": {
     "lib": ["esnext"],
-    "module": "commonjs",
-    "moduleResolution": "node",
+    "types": ["node"],
+    "module": "node16",
+    "moduleResolution": "node16",
     "target": "es2019",
     "declaration": true,
     "declarationMap": true,

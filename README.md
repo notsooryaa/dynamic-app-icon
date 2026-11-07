@@ -69,6 +69,31 @@ npx expo prebuild --clean
 npx expo run:ios      # or run:android
 ```
 
+### Android adaptive icons
+
+Instead of a path, an icon can be an object with adaptive layers. Android then
+gets a real adaptive icon (launcher masking, and a themed icon on Android 13+).
+
+```json
+"icons": {
+  "default": {
+    "source": "./assets/icon-default.png",
+    "foreground": "./assets/adaptive-fg.png",
+    "background": "#E6F4FE" || "./assets/adaptive-bg.png",
+    "monochrome": "./assets/adaptive-mono.png"
+  },
+  "dark": "./assets/icon-dark.png"
+}
+```
+
+- `foreground`: transparent PNG. Keep artwork inside the central ~66% safe zone.
+- `background`: an image path or a `#RRGGBB` color. Defaults to white.
+- `monochrome`: single-color PNG for themed icons. Optional.
+- `source`: full square icon, used by iOS and as the legacy Android icon.
+  Defaults to `foreground` if omitted (iOS then gets it flattened on white).
+- `background`/`monochrome` need a `foreground`. A plain path string still works
+  and produces a legacy (non-adaptive) Android icon.
+
 ### Icon rules
 
 - **`default`** is your app's primary icon. `resetAppIcon()` returns to it.

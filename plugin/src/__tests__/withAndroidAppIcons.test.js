@@ -121,6 +121,68 @@ describe('withAndroidAppIcons manifest', () => {
   });
 });
 
+describe('withAndroidAppIcons adaptive icons', () => {
+  it('generates adaptive layers, XML and color background drawable', async () => {
+    const icons = [
+      {
+        name: 'adaptive',
+        source: iconSrc,
+        adaptive: {
+          foreground: iconSrc,
+          backgroundColor: '#112233',
+          monochrome: iconSrc,
+        },
+      },
+      {
+        name: 'imgbg',
+        source: iconSrc,
+        adaptive: { foreground: iconSrc, backgroundImage: iconSrc },
+      },
+    ];
+    const { dangerous } = getMods(icons);
+    await dangerous({ modResults: {}, modRequest: modRequest() });
+
+    const res = path.join(platformProjectRoot, 'app', 'src', 'main', 'res');
+    const fg = path.join(res, 'mipmap-xxxhdpi', 'ic_launcher_dai_adaptive_foreground.png');
+    const info = await getPngInfo(fg);
+    expect(info.width).toBe(432);
+    expect(
+      fs.existsSync(path.join(res, 'mipmap-mdpi', 'ic_launcher_dai_adaptive_monochrome.png'))
+    ).toBe(true);
+    expect(
+      fs.existsSync(path.join(res, 'mipmap-mdpi', 'ic_launcher_dai_imgbg_background.png'))
+    ).toBe(true);
+
+    const xml = fs.readFileSync(
+      path.join(res, 'mipmap-anydpi-v26', 'ic_launcher_dai_adaptive.xml'),
+      'utf8'
+    );
+    expect(xml).toContain('<monochrome');
+    expect(xml).toContain('@drawable/ic_launcher_dai_adaptive_background');
+    const bg = fs.readFileSync(
+      path.join(res, 'drawable', 'ic_launcher_dai_adaptive_background.xml'),
+      'utf8'
+    );
+    expect(bg).toContain('#112233');
+    const xml2 = fs.readFileSync(
+      path.join(res, 'mipmap-anydpi-v26', 'ic_launcher_dai_imgbg.xml'),
+      'utf8'
+    );
+    expect(xml2).toContain('@mipmap/ic_launcher_dai_imgbg_background');
+    expect(xml2).not.toContain('<monochrome');
+
+    // Removing icons cleans up stale adaptive output.
+    const only = getMods([{ name: 'default', source: iconSrc }]);
+    await only.dangerous({ modResults: {}, modRequest: modRequest() });
+    expect(fs.existsSync(path.join(res, 'mipmap-anydpi-v26', 'ic_launcher_dai_adaptive.xml'))).toBe(
+      false
+    );
+    expect(
+      fs.existsSync(path.join(res, 'drawable', 'ic_launcher_dai_adaptive_background.xml'))
+    ).toBe(false);
+  }, 60000);
+});
+
 describe('withAndroidAppIcons mipmap generation', () => {
   it('generates correctly sized PNGs in every density bucket and is idempotent', async () => {
     const icons = [{ name: 'default', source: iconSrc }];
@@ -146,6 +208,6 @@ describe('withAndroidAppIcons mipmap generation', () => {
     // Second run must not accumulate files.
     await dangerous({ modResults: {}, modRequest: modRequest() });
     const mdpi = fs.readdirSync(path.join(res, 'mipmap-mdpi'));
-    expect(mdpi.filter((f) => f.startsWith('ic_launcher_dai_'))).toHaveLength(1);
+    expect(mdpi.filter((f) => f.startsWith('ic_launcher_dai_default'))).toHaveLength(1);
   }, 60000);
 });

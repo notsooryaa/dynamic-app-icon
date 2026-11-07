@@ -30,13 +30,16 @@ const ICONS_METADATA_NAME = 'com.barberaa.dynamicappicon.ICON_NAMES';
  * Android launcher icon densities. Values are the target square size in px for
  * a legacy (non-adaptive) launcher icon at each density bucket.
  */
-const MIPMAP_DENSITIES: { folder: string; size: number }[] = [
-  { folder: 'mipmap-mdpi', size: 48 },
-  { folder: 'mipmap-hdpi', size: 72 },
-  { folder: 'mipmap-xhdpi', size: 96 },
-  { folder: 'mipmap-xxhdpi', size: 144 },
-  { folder: 'mipmap-xxxhdpi', size: 192 },
+const MIPMAP_DENSITIES: { folder: string; size: number; layerSize: number }[] = [
+  { folder: 'mipmap-mdpi', size: 48, layerSize: 108 },
+  { folder: 'mipmap-hdpi', size: 72, layerSize: 162 },
+  { folder: 'mipmap-xhdpi', size: 96, layerSize: 216 },
+  { folder: 'mipmap-xxhdpi', size: 144, layerSize: 324 },
+  { folder: 'mipmap-xxxhdpi', size: 192, layerSize: 432 },
 ];
+
+/** Resource folder for adaptive icon XML (API 26+). */
+const ADAPTIVE_XML_FOLDER = 'mipmap-anydpi-v26';
 
 /**
  * Configure Android launcher icons + activity aliases for runtime switching.
@@ -79,37 +82,137 @@ function withGeneratedMipmaps(
     async (config) => {
       const resPath = path.join(config.modRequest.platformProjectRoot, 'app', 'src', 'main', 'res');
 
-      for (const { folder, size } of MIPMAP_DENSITIES) {
+      const projectRoot = config.modRequest.projectRoot;
+
+      for (const { folder } of MIPMAP_DENSITIES) {
+        removeGeneratedFiles(path.join(resPath, folder));
+      }
+      removeGeneratedFiles(path.join(resPath, ADAPTIVE_XML_FOLDER));
+      removeGeneratedFiles(path.join(resPath, 'drawable'));
+
+      for (const { folder, size, layerSize } of MIPMAP_DENSITIES) {
         const dir = path.join(resPath, folder);
-        removeGeneratedFiles(dir);
         await fs.promises.mkdir(dir, { recursive: true });
 
         for (const icon of icons) {
-          const { source } = await generateImageAsync(
-            {
-              projectRoot: config.modRequest.projectRoot,
-              cacheType: 'dynamic-app-icon',
-            },
-            {
-              src: icon.source,
-              // The cache is keyed by src/resizeMode/backgroundColor and the
-              // returned file name — NOT by dimensions. Encode the size into
-              // the name so each density gets its own cache entry instead of
-              // reusing the first (smallest) generated image.
-              name: `${resourceNameFor(icon)}_${size}.png`,
-              width: size,
-              height: size,
-              resizeMode: 'cover',
-              backgroundColor: '#FFFFFF',
-            }
+          const name = resourceNameFor(icon);
+          const adaptive = icon.adaptive;
+
+          // Legacy icon (also the fallback below API 26).
+          await writeResized(
+            projectRoot,
+            icon.source,
+            `${name}_${size}.png`,
+            size,
+            path.join(dir, `${name}.png`),
+            adaptive?.backgroundColor ?? '#FFFFFF'
           );
-          await fs.promises.writeFile(path.join(dir, `${resourceNameFor(icon)}.png`), source);
+
+          if (!adaptive) {
+            continue;
+          }
+
+          await writeResized(
+            projectRoot,
+            adaptive.foreground,
+            `${name}_foreground_${layerSize}.png`,
+            layerSize,
+            path.join(dir, `${name}_foreground.png`),
+            'transparent'
+          );
+
+          if (adaptive.backgroundImage) {
+            await writeResized(
+              projectRoot,
+              adaptive.backgroundImage,
+              `${name}_background_${layerSize}.png`,
+              layerSize,
+              path.join(dir, `${name}_background.png`),
+              '#FFFFFF'
+            );
+          }
+
+          if (adaptive.monochrome) {
+            await writeResized(
+              projectRoot,
+              adaptive.monochrome,
+              `${name}_monochrome_${layerSize}.png`,
+              layerSize,
+              path.join(dir, `${name}_monochrome.png`),
+              'transparent'
+            );
+          }
         }
+      }
+
+      // Adaptive icon XML (API 26+) and solid-color background drawables.
+      for (const icon of icons) {
+        const adaptive = icon.adaptive;
+        if (!adaptive) {
+          continue;
+        }
+        const name = resourceNameFor(icon);
+
+        let background: string;
+        if (adaptive.backgroundImage) {
+          background = `@mipmap/${name}_background`;
+        } else {
+          const drawableDir = path.join(resPath, 'drawable');
+          await fs.promises.mkdir(drawableDir, { recursive: true });
+          await fs.promises.writeFile(
+            path.join(drawableDir, `${name}_background.xml`),
+            `<?xml version="1.0" encoding="utf-8"?>\n` +
+              `<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">\n` +
+              `  <solid android:color="${adaptive.backgroundColor}" />\n` +
+              `</shape>\n`
+          );
+          background = `@drawable/${name}_background`;
+        }
+
+        const xmlDir = path.join(resPath, ADAPTIVE_XML_FOLDER);
+        await fs.promises.mkdir(xmlDir, { recursive: true });
+        await fs.promises.writeFile(
+          path.join(xmlDir, `${name}.xml`),
+          `<?xml version="1.0" encoding="utf-8"?>\n` +
+            `<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">\n` +
+            `  <background android:drawable="${background}" />\n` +
+            `  <foreground android:drawable="@mipmap/${name}_foreground" />\n` +
+            (adaptive.monochrome
+              ? `  <monochrome android:drawable="@mipmap/${name}_monochrome" />\n`
+              : '') +
+            `</adaptive-icon>\n`
+        );
       }
 
       return config;
     },
   ]);
+}
+
+/** Resize `src` to a square of `size` px and write it to `dest`. */
+async function writeResized(
+  projectRoot: string,
+  src: string,
+  cacheName: string,
+  size: number,
+  dest: string,
+  backgroundColor: string
+): Promise<void> {
+  const { source } = await generateImageAsync(
+    { projectRoot, cacheType: 'dynamic-app-icon' },
+    {
+      src,
+      // The cache is keyed by src/resizeMode/backgroundColor and the returned
+      // file name, NOT by dimensions. Encode the size into the name so each
+      // density gets its own cache entry.
+      name: cacheName,
+      width: size,
+      height: size,
+      resizeMode: 'cover',
+      backgroundColor,
+    }
+  );
+  await fs.promises.writeFile(dest, source);
 }
 
 /** Delete this plugin's previously generated PNGs from a directory. */
